@@ -13,12 +13,14 @@ const getNameFields = () => [
     title: t`First name`,
     placeholder: "Johnny",
     autoFocus: true,
+    // XXX: I haven't checked, what forms use this field, but I think we need to make this field optional.
     validate: validate.required().maxLength(100),
   },
   {
     name: "last_name",
     title: t`Last name`,
     placeholder: "Appleseed",
+    // XXX: I haven't checked, what forms use this field, but I think we need to make this field optional.
     validate: validate.required().maxLength(100),
   },
 ];
