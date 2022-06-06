@@ -102,7 +102,7 @@
             (not (isa? (keyword base-type) :type/Temporal))
             (#{:list :auto-list} (keyword has-field-values)))))))
 
-(defn- values-less-than-total-max-length?
+(defn- values-exceed-total-max-length?
   "`true` if the combined length of all the values in [[distinct-values]] is below the threshold for what we'll allow in a
   FieldValues entry. Does some logging as well."
   [distinct-values]
@@ -115,7 +115,7 @@
                             new-total)))
                       0
                       distinct-values)]
-    (u/prog1 (<= total-length total-max-length)
+    (u/prog1 (> total-length total-max-length)
       (log/debug (trs "Field values total length is > {0}." total-max-length)
                  (if <>
                    (trs "FieldValues are allowed for this Field.")
@@ -123,18 +123,26 @@
 
 (defn distinct-values
   "Fetch a sequence of distinct values for `field` that are below the [[total-max-length]] threshold. If the values are
-  past the threshold, this returns `nil`. (This function provides the values that normally get saved as a Field's
-  FieldValues. You most likely should not be using this directly in code outside of this namespace, unless it's for a
+  past the threshold, this returns `nil`.
+  Bypass the check by passing `check-length?=false`
+
+  (This function provides the values that normally get saved as a Field's FieldValues.
+  You most likely should not be using this directly in code outside of this namespace, unless it's for a
   very specific reason, such as certain cases where we fetch ad-hoc FieldValues for GTAP-filtered Fields.)"
-  [field]
-  (classloader/require 'metabase.db.metadata-queries)
-  (try
+  ([field]
+   (distinct-values field true))
+
+  ([field check-length?]
+   (classloader/require 'metabase.db.metadata-queries)
+   (try
     (let [values ((resolve 'metabase.db.metadata-queries/field-distinct-values) field)]
-      (when (values-less-than-total-max-length? values)
+      (if (and check-length?
+               (values-exceed-total-max-length? values))
+        nil
         values))
     (catch Throwable e
       (log/error e (trs "Error fetching field values"))
-      nil)))
+      nil))))
 
 (defn- fixup-human-readable-values
   "Field values and human readable values are lists that are zipped together. If the field values have changes, the
@@ -150,9 +158,14 @@
    it; otherwise create a new FieldValues object with the newly fetched values. Returns whether the field values were
    created/updated/deleted as a result of this call."
   [field & [human-readable-values]]
-  (let [field-values (FieldValues :field_id (u/the-id field))
-        values       (distinct-values field)
-        field-name   (or (:name field) (:id field))]
+  (let [field-values    (FieldValues :field_id (u/the-id field))
+        values          (distinct-values field false)
+        field-name      (or (:name field) (:id field))
+        exceeded-limit? (or (> (count values) auto-list-cardinality-threshold)
+                            (values-exceed-total-max-length? values))]
+    (when (and (= (:has_field_values field) :list)
+               exceeded-limit?)
+      (db/update! 'Field (u/the-id field) :exceed_limit true))
     (cond
       ;; If this Field is marked `auto-list`, and the number of values in now over the list threshold, we need to
       ;; unmark it as `auto-list`. Switch it to `has_field_values` = `nil` and delete the FieldValues; this will
@@ -163,7 +176,7 @@
       ;; It would be nicer if we could do this in analysis where it gets marked `:auto-list` in the first place, but
       ;; Fingerprints don't get updated regularly enough that we could detect the sudden increase in cardinality in a
       ;; way that could make this work. Thus, we are stuck doing it here :(
-      (and (> (count values) auto-list-cardinality-threshold)
+      (and exceeded-limit?
            (= :auto-list (keyword (:has_field_values field))))
       (do
         (log/info (trs "Field {0} was previously automatically set to show a list widget, but now has {1} values."
