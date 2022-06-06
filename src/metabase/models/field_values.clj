@@ -165,7 +165,7 @@
                             (values-exceed-total-max-length? values))]
     (when (and (= (:has_field_values field) :list)
                exceeded-limit?)
-      (db/update! 'Field (u/the-id field) :exceed_limit true))
+      (db/update! 'Field (u/the-id field) :exceeded_limit true))
     (cond
       ;; If this Field is marked `auto-list`, and the number of values in now over the list threshold, we need to
       ;; unmark it as `auto-list`. Switch it to `has_field_values` = `nil` and delete the FieldValues; this will
