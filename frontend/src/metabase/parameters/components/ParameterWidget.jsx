@@ -1,19 +1,14 @@
 /* eslint-disable react/prop-types */
 import React, { Component } from "react";
 import PropTypes from "prop-types";
-import ParameterValueWidget from "./ParameterValueWidget";
-import Icon from "metabase/components/Icon";
-import { color } from "metabase/lib/colors";
-
-import S from "./ParameterWidget.css";
 import cx from "classnames";
 
+import ParameterValueWidget from "./ParameterValueWidget";
+import S from "./ParameterWidget.css";
 import FieldSet from "../../components/FieldSet";
 
 export default class ParameterWidget extends Component {
   state = {
-    isEditingName: false,
-    editingNameValue: undefined,
     isFocused: false,
   };
 
@@ -28,15 +23,7 @@ export default class ParameterWidget extends Component {
   };
 
   renderPopover(value, setValue, placeholder, isFullscreen) {
-    const {
-      dashboard,
-      parameter,
-      editingParameter,
-      commitImmediately,
-      parameters,
-    } = this.props;
-
-    const isEditingParameter = editingParameter?.id === parameter.id;
+    const { dashboard, parameter, commitImmediately, parameters } = this.props;
 
     return (
       <ParameterValueWidget
@@ -46,7 +33,6 @@ export default class ParameterWidget extends Component {
         name={name}
         value={value}
         setValue={setValue}
-        isEditing={isEditingParameter}
         placeholder={placeholder}
         focusChanged={this.focusChanged}
         isFullscreen={isFullscreen}
@@ -63,17 +49,10 @@ export default class ParameterWidget extends Component {
     const {
       className,
       parameter,
-      isEditing,
       isFullscreen,
-      editingParameter,
-      setEditingParameter,
       setValue,
       children,
-      dragHandle,
     } = this.props;
-
-    const isEditingParameter =
-      editingParameter && editingParameter.id === parameter.id;
 
     const renderFieldInNormalMode = () => {
       const fieldHasValueOrFocus =
@@ -99,33 +78,6 @@ export default class ParameterWidget extends Component {
       );
     };
 
-    const renderEditing = () => (
-      <div
-        className={cx(
-          className,
-          "flex align-center bordered rounded cursor-pointer text-bold mr1 mb1",
-          {
-            "bg-brand text-white": isEditingParameter,
-            "text-brand-hover bg-white": !isEditingParameter,
-          },
-        )}
-        onClick={() =>
-          setEditingParameter(isEditingParameter ? null : parameter.id)
-        }
-        style={{
-          padding: 8,
-          width: 170,
-          borderColor: isEditingParameter && color("brand"),
-        }}
-      >
-        <div className="mr1" onClick={e => e.stopPropagation()}>
-          {dragHandle}
-        </div>
-        {parameter.name}
-        <Icon className="flex-align-right" name="gear" />
-      </div>
-    );
-
     if (isFullscreen) {
       if (parameter.value != null) {
         return (
@@ -134,8 +86,6 @@ export default class ParameterWidget extends Component {
       } else {
         return <span className="hide" />;
       }
-    } else if (isEditing && setEditingParameter) {
-      return renderEditing();
     } else {
       return renderFieldInNormalMode();
     }
